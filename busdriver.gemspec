@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = "busdriver"
   s.email = "mark.fine@gmail.com"
-  s.version = "0.2"
+  s.version = "0.3"
   s.description = "A highly available redis bus client for Ruby apps."
   s.summary = "HA redis bus client"
   s.authors = ["Mark Fine"]
