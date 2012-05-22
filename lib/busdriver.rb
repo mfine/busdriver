@@ -71,14 +71,14 @@ module Busdriver
   def self.publish(key, data)
     header = header_format
     payload_json = JSON.dump(header: header, payload: data)
-    printfm __FILE__, __method__, header, key: key
+    pdfm __FILE__, __method__, header, key: key
     conns.shuffle.each do |conn|
       begin
         conn.rpush(key, payload_json)
         conn.expire(key, time_to_expire) rescue nil
-        printfm __FILE__, __method__, at: "published", key: key
+        pdfm __FILE__, __method__, at: "published", key: key
       rescue => e
-        printfme __FILE__, __method__, e, host: conn.client.host
+        pdfme __FILE__, __method__, e, host: conn.client.host
       end
     end
   end
@@ -91,21 +91,21 @@ module Busdriver
           payload = JSON.parse(payload_json)
           header, data = payload.values_at("header", "payload")
           published_on, ttl = header.values_at("published_on", "ttl")
-          printfm __FILE__, __method__, header, key: key
+          pdfm __FILE__, __method__, header, key: key
           if Time.now.to_i - published_on.to_i > ttl
-            printfm __FILE__, __method__, header, at: "timeout", key: key
+            pdfm __FILE__, __method__, header, at: "timeout", key: key
           else
             begin
-              printfm __FILE__, __method__, header, at: "received", key: key
+              pdfm __FILE__, __method__, header, at: "received", key: key
               yield key, data
-              printfm __FILE__, __method__, header, at: "processed", key: key
+              pdfm __FILE__, __method__, header, at: "processed", key: key
             rescue => e
-              printfme __FILE__, __method__, e
+              pdfme __FILE__, __method__, e
             end
           end
         end
       rescue => e
-        printfme __FILE__, __method__, e, host: conn.client.host
+        pdfme __FILE__, __method__, e, host: conn.client.host
         raise e
       end
     end
@@ -121,10 +121,10 @@ module Busdriver
           llens[key] += len
         end
       rescue => e
-        printfme __FILE__, __method__, e, host: conn.client.host
+        pdfme __FILE__, __method__, e, host: conn.client.host
       end
     end
-    printfm __FILE__, __method__, llens, length: llen
+    pdfm __FILE__, __method__, llens, length: llen
   end
 
   def self.drain(pattern)
@@ -132,10 +132,10 @@ module Busdriver
       begin
         conn.keys(pattern).each do |key|
           conn.del(key)
-          printfm __FILE__, __method__, key: key
+          pdfm __FILE__, __method__, key: key
         end
       rescue => e
-        printfme __FILE__, __method__, e, host: conn.client.host
+        pdfme __FILE__, __method__, e, host: conn.client.host
       end
     end
   end
