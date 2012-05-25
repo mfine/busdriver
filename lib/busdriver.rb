@@ -77,6 +77,7 @@ module Busdriver
         conn.rpush(key, payload_json)
         conn.expire(key, time_to_expire) rescue nil
         pdfm __FILE__, __method__, at: "published", key: key
+        break
       rescue => e
         pdfme __FILE__, __method__, e, host: conn.client.host
       end
