@@ -118,6 +118,45 @@ module Busdriver
     end
   end
 
+  def self.publishz(zone, key, data)
+    header = header_format.merge(zone: zone)
+    payload_json = JSON.dump(header: header, payload: data)
+    pdfm __FILE__, __method__, header, key: key
+    conns[zone.ord % urls.size].rpush(key, payload_json)
+    conns[zone.ord % urls.size].expire(key, time_to_expire) rescue nil
+    pdfm __FILE__, __method__, at: "published", key: key
+  rescue => e
+    pdfme __FILE__, __method__, e
+  end
+
+  def self.subscribez(keys, &blk)
+    while true
+      begin
+        key, payload_json = conn.blpop(*keys, 1)
+        if payload_json
+          payload = JSON.parse(payload_json)
+          header, data = payload.values_at("header", "payload")
+          published_on, ttl, zone = header.values_at("published_on", "ttl", "zone")
+          pdfm __FILE__, __method__, header, key: key
+          if Time.now.to_i - published_on.to_i > ttl
+            pdfm __FILE__, __method__, header, at: "timeout", key: key
+          else
+            begin
+              pdfm __FILE__, __method__, header, at: "received", key: key
+              yield zone, key, data
+              pdfm __FILE__, __method__, header, at: "processed", key: key
+            rescue => e
+              pdfme __FILE__, __method__, e
+            end
+          end
+        end
+      rescue => e
+        pdfme __FILE__, __method__, e, host: conn.client.host
+        raise e
+      end
+    end
+  end
+
   def self.counts(pattern)
     llen, llens = 0, Hash.new(0)
     each do |conn|
