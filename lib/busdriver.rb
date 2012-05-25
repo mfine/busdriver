@@ -64,6 +64,16 @@ module Busdriver
     @conn ||= connect(url)
   end
 
+  def self.each(&blk)
+    conns.shuffle.each do |conn|
+      begin
+        yield conn
+      rescue => e
+        pdfme __FILE__, __method__, e, host: conn.client.host
+      end
+    end
+  end
+
   def self.header_format
     { message_id: SecureRandom.uuid, published_on: Time.now.to_i, ttl: time_to_live }
   end
@@ -72,15 +82,11 @@ module Busdriver
     header = header_format
     payload_json = JSON.dump(header: header, payload: data)
     pdfm __FILE__, __method__, header, key: key
-    conns.shuffle.each do |conn|
-      begin
-        conn.rpush(key, payload_json)
-        conn.expire(key, time_to_expire) rescue nil
-        pdfm __FILE__, __method__, at: "published", key: key
-        break
-      rescue => e
-        pdfme __FILE__, __method__, e, host: conn.client.host
-      end
+    each do |conn|
+      conn.rpush(key, payload_json)
+      conn.expire(key, time_to_expire) rescue nil
+      pdfm __FILE__, __method__, at: "published", key: key
+      break
     end
   end
 
@@ -114,29 +120,21 @@ module Busdriver
 
   def self.counts(pattern)
     llen, llens = 0, Hash.new(0)
-    conns.shuffle.each do |conn|
-      begin
-        conn.keys(pattern).each do |key|
-          len = conn.llen(key)
-          llen += len
-          llens[key] += len
-        end
-      rescue => e
-        pdfme __FILE__, __method__, e, host: conn.client.host
+    each do |conn|
+      conn.keys(pattern).each do |key|
+        len = conn.llen(key)
+        llen += len
+        llens[key] += len
       end
     end
     pdfm __FILE__, __method__, llens, length: llen
   end
 
   def self.drain(pattern)
-    conns.shuffle.each do |conn|
-      begin
-        conn.keys(pattern).each do |key|
-          conn.del(key)
-          pdfm __FILE__, __method__, key: key
-        end
-      rescue => e
-        pdfme __FILE__, __method__, e, host: conn.client.host
+    each do |conn|
+      conn.keys(pattern).each do |key|
+        conn.del(key)
+        pdfm __FILE__, __method__, key: key
       end
     end
   end
